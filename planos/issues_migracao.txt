@@ -1,0 +1,520 @@
+TITLE: [MIG][F1-MOD] Mapear e Migrar Modelo de Dados: User (Usuário)
+TYPE: feature
+LABELS: migracao,modelo-dados,autenticacao,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Mapear a entidade `Usuario.java` para o modelo `App\Models\User` do Laravel, integrando campos existentes do CotaG L12 e adicionando os necessários do sistema Java. Esta é uma etapa fundamental para a autenticação e gestão de usuários.
+FEATURE_DESCRIPTION: Analisar `Usuario.java` e o `App\Models\User` do CotaG L12.
+Campos a mapear/adicionar:
+- `codpes`: Já presente e usado no CotaG L12 `User`.
+- `nompes`: Mapear para o campo `name` do `User` Laravel.
+- `email`: Campo padrão `email` do `User` Laravel.
+- `senha`: Será gerenciado pelo sistema de hashing do Laravel (Bcrypt).
+- `salt`: Não será migrado/necessário com Bcrypt.
+- Relação com `Papel.java` será mapeada para `Spatie\Permission\Models\Role`.
+- Outros campos de `Pessoa.java` (se houver além de `codpes`, `nompes`, `vinculos`): Conforme Decisão 1.C, avaliar campo a campo. Os mais usados com autenticação vão para `User`. Campos menos usados ou muito específicos podem ir para um `UserProfile` (a ser criado em issue separada se a avaliação indicar necessidade). Vínculos serão tratados via Senha Única.
+PROPOSED_SOLUTION:
+1. Modificar a migração existente de `users` (ou criar uma nova se necessário) para adicionar quaisquer campos de `Usuario.java` / `Pessoa.java` que, após avaliação (Decisão 1.C), devam residir diretamente no modelo `User`.
+2. Atualizar o modelo `App\Models\User` para incluir os novos campos no `$fillable` (se aplicável) e quaisquer casts necessários.
+3. Garantir que o Trait `Spatie\Permission\Traits\HasRoles` esteja presente no modelo `User`.
+4. Garantir que o Trait `Uspdev\SenhaunicaSocialite\Traits\HasSenhaunica` esteja presente.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Modelo `App\Models\User` atualizado com os campos mapeados de `Usuario.java` (e `Pessoa.java` conforme Decisão 1.C).
+- [ ] AC2: Migração para a tabela `users` ajustada/criada para refletir os campos do AC1.
+- [ ] AC3: Propriedade `$fillable` (ou `$guarded`) do modelo `User` atualizada.
+- [ ] AC4: Casts de atributos no modelo `User` definidos (ex: `codpes` como integer, se não for).
+- [ ] AC5: Trait `HasRoles` (Spatie) confirmado no modelo `User`.
+- [ ] AC6: Trait `HasSenhaunica` confirmado no modelo `User`.
+- [ ] AC7: Documentação interna do modelo `User` (DocBlocks) atualizada.
+- [ ] AC8: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F1-MOD] Mapear e Migrar Modelo de Dados: Role (Papel)
+TYPE: feature
+LABELS: migracao,modelo-dados,autorizacao,spatie,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Mapear a entidade `Papel.java` para o sistema de Roles do `spatie/laravel-permission`, permitindo a gestão de papéis de usuário no novo sistema.
+FEATURE_DESCRIPTION: A entidade `Papel.java` (campos `id`, `nome`) será mapeada para o modelo `Spatie\Permission\Models\Role`. O CotaG L12 já inclui a instalação e migrações do pacote `spatie/laravel-permission`. Esta tarefa foca na criação dos papéis específicos do sistema "cotag".
+PROPOSED_SOLUTION:
+1. Utilizar o `RoleSeeder.php` (já existente/sugerido no CotaG L12) para criar os papéis.
+2. Conforme Decisão 5.A, os papéis a serem criados no guard `web` serão: `Admin`, `Operator`, `User`. Os papéis `usp_user` e `external_user` (também do guard `web`) já são considerados pelo CotaG L12.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Migrações do pacote `spatie/laravel-permission` confirmadas como parte do setup do CotaG L12.
+- [ ] AC2: `RoleSeeder.php` modificado/criado para incluir a criação dos papéis `Admin`, `Operator`, `User` para o guard `web`.
+- [ ] AC3: `RoleSeeder.php` garante a criação dos papéis `usp_user` e `external_user` para o guard `web`.
+- [ ] AC4: `DatabaseSeeder.php` chama o `RoleSeeder.php`.
+- [ ] AC5: Após executar `php artisan db:seed`, os papéis `Admin`, `Operator`, `User`, `usp_user`, `external_user` existem na tabela `roles`.
+- [ ] AC6: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F1-MOD] Implementar Modelo de Dados: Cota (Regular)
+TYPE: feature
+LABELS: migracao,modelo-dados,cotas,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Criar o modelo Eloquent e a estrutura de banco de dados para gerenciar as cotas regulares de impressão, baseadas no vínculo do usuário.
+FEATURE_DESCRIPTION: Corresponde ao `Cota.java`. O modelo `App\Models\Cota` armazenará o valor da cota padrão para diferentes tipos de vínculo USP (ex: 'ALUNOGR', 'SERVIDOR').
+PROPOSED_SOLUTION:
+1. Criar o modelo Eloquent `App\Models\Cota`.
+2. Criar a migração para a tabela `cotas`.
+3. Definir campos no modelo e migração: `vinculo` (string, indexado), `valor` (integer, não negativo).
+4. Criar `CotaSeeder.php` para popular cotas padrão para vínculos comuns.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Modelo `App\Models\Cota` criado com os campos `vinculo` e `valor`.
+- [ ] AC2: Migração para a tabela `cotas` criada, definindo colunas `vinculo` (string) e `valor` (integer).
+- [ ] AC3: `CotaSeeder.php` criado e populando exemplos de cotas (ex: 'ALUNOGR' => 100, 'SERVIDOR' => 200).
+- [ ] AC4: `DatabaseSeeder.php` chama o `CotaSeeder.php`.
+- [ ] AC5: Após `db:seed`, a tabela `cotas` contém os dados semeados.
+- [ ] AC6: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F1-MOD] Implementar Modelo de Dados: Cota Especial
+TYPE: feature
+LABELS: migracao,modelo-dados,cotas,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Criar o modelo Eloquent e a estrutura de banco de dados para gerenciar cotas de impressão especiais, que podem ser atribuídas individualmente a usuários.
+FEATURE_DESCRIPTION: Corresponde ao `CotaEspecial.java`. O modelo `App\Models\CotaEspecial` terá uma relação `OneToOne` com `App\Models\User`.
+PROPOSED_SOLUTION:
+1. Criar o modelo Eloquent `App\Models\CotaEspecial`.
+2. Criar a migração para a tabela `cota_especials`.
+3. Definir campos: `user_id` (foreign key para `users.id`, unique), `valor` (integer, não negativo).
+4. Definir relacionamento `belongsTo User` em `CotaEspecial` e `hasOne CotaEspecial` em `User`.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Modelo `App\Models\CotaEspecial` criado com campos `user_id` e `valor`.
+- [ ] AC2: Migração para a tabela `cota_especials` criada com colunas `user_id` (FK, unique) e `valor` (integer).
+- [ ] AC3: Relacionamento `belongsTo(User::class)` definido em `CotaEspecial.php`.
+- [ ] AC4: Relacionamento `hasOne(CotaEspecial::class)` definido em `User.php`.
+- [ ] AC5: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F1-MOD] Implementar Modelo de Dados: Lançamento
+TYPE: feature
+LABELS: migracao,modelo-dados,lancamentos,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Criar o modelo Eloquent e a estrutura de banco de dados para registrar os lançamentos (débitos/créditos) nas cotas dos usuários.
+FEATURE_DESCRIPTION: Corresponde ao `Lancamento.java`.
+PROPOSED_SOLUTION:
+1. Criar o modelo Eloquent `App\Models\Lancamento`.
+2. Criar a migração para a tabela `lancamentos`.
+3. Definir campos:
+    - `user_id` (FK para `users.id`, referente à pessoa que possui a cota).
+    - `operador_id` (FK para `users.id`, referente ao usuário que registrou o lançamento).
+    - `tipo_lancamento` (string, para armazenar o valor do Enum: 'credito' ou 'debito').
+    - `valor` (integer, positivo).
+    - `data` (datetime, ou usar `created_at` do Eloquent).
+4. **Decisão (17.A):** Criar um Enum PHP `App\Enums\TipoLancamento:string` com casos `CREDITO = 'credito'` e `DEBITO = 'debito'`.
+5. Adicionar cast para o Enum `tipo_lancamento` no modelo `Lancamento`.
+6. Definir relacionamentos: `belongsTo User as pessoaCota` e `belongsTo User as operador` em `Lancamento`. Adicionar `hasMany Lancamento` (como `lancamentosPessoa`) e `hasMany Lancamento` (como `lancamentosOperados`) em `User`.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Modelo `App\Models\Lancamento` criado.
+- [ ] AC2: Migração para a tabela `lancamentos` criada com colunas `user_id`, `operador_id`, `tipo_lancamento` (string), `valor` (integer), e timestamps.
+- [ ] AC3: Enum PHP `App\Enums\TipoLancamento` criado com casos `CREDITO` e `DEBITO` e backing de string.
+- [ ] AC4: Cast para `TipoLancamento` adicionado ao modelo `Lancamento` para o campo `tipo_lancamento`.
+- [ ] AC5: Relacionamentos `belongsTo` (`pessoaCota`, `operador`) definidos em `Lancamento.php`.
+- [ ] AC6: Relacionamentos `hasMany` (`lancamentosPessoa`, `lancamentosOperados`) definidos em `User.php`.
+- [ ] AC7: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F1-LOG] Integrar e Configurar Spatie Laravel ActivityLog
+TYPE: chore
+LABELS: migracao,logging,spatie,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+CHORE_MOTIVATION: Implementar um sistema de log de atividades robusto, substituindo a lógica customizada de `Log.java`, utilizando um pacote padrão da comunidade Laravel.
+CHORE_DESCRIPTION: **Decisão (2.B):** O sistema de log será implementado utilizando o pacote `spatie/laravel-activitylog`.
+PROPOSED_SOLUTION:
+1. Instalar o pacote `spatie/laravel-activitylog` via Composer (se ainda não estiver no CotaG L12).
+2. Publicar e executar a migração do pacote para criar a tabela `activity_log`.
+3. Configurar os modelos Eloquent que devem ter suas atividades logadas (ex: `Cota`, `CotaEspecial`, `Lancamento`, `User` para logins/mudanças de papel).
+4. Definir quais eventos (created, updated, deleted) devem ser logados para cada modelo.
+5. Considerar logar eventos customizados para ações específicas (ex: falha de login, tentativa de acesso não autorizado).
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Pacote `spatie/laravel-activitylog` instalado e configurado.
+- [ ] AC2: Migração da tabela `activity_log` executada.
+- [ ] AC3: Modelos principais (`User`, `Cota`, `CotaEspecial`, `Lancamento`) configurados para logar eventos de CRUD (created, updated, deleted).
+- [ ] AC4: Evento de login de usuário (local e Senha Única) logado.
+- [ ] AC5: Evento de logout de usuário logado.
+- [ ] AC6: Alterações de papéis de usuário (via Spatie Permission) logadas.
+- [ ] AC7: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F1-AUTH] Estratégia de Migração de Senhas de Usuários Locais
+TYPE: chore
+LABELS: migracao,autenticacao,seguranca,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+CHORE_MOTIVATION: Definir e documentar a estratégia para lidar com as senhas dos usuários que possuíam login local no sistema Java, garantindo segurança e uma transição clara para os usuários.
+CHORE_DESCRIPTION: **Decisão (3.A):** A estratégia adotada será forçar um reset de senha para todos os usuários locais migrados do sistema Java. As senhas antigas (hash `sha256(senha+salt)`) não serão migradas nem haverá tentativa de re-hash no primeiro login.
+PROPOSED_SOLUTION:
+1. Durante o script de migração de dados de usuários (a ser criado em issue futura), para cada usuário local migrado, não transferir o hash da senha antiga.
+2. Marcar esses usuários de forma que o sistema possa identificar que eles precisam de um "primeiro login especial" ou que sua senha precisa ser redefinida. (Alternativa: não marcar, apenas não terão senha válida no Laravel).
+3. Definir o fluxo para notificar esses usuários sobre a necessidade de criar uma nova senha (ex: email em massa após a migração, ou notificação na primeira tentativa de login com email existente mas sem senha válida).
+4. O fluxo de "Esqueci minha senha" do Laravel Breeze será o mecanismo principal para que esses usuários definam sua nova senha.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Documentação da estratégia de migração de senhas atualizada para refletir a Decisão 3.A.
+- [ ] AC2: Plano de comunicação aos usuários locais sobre a necessidade de reset de senha definido.
+- [ ] AC3: Testes para o fluxo de "Esqueci minha senha" do Breeze confirmados como funcionais no CotaG L12 (já cobertos pelos testes Breeze).
+------
+TITLE: [MIG][F2-AUTH] Refinar Callback Senha Única e Sincronização de Papéis
+TYPE: feature
+LABELS: migracao,autenticacao,senha-unica,spatie,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Garantir que o callback da Senha Única USP funcione corretamente, criando ou atualizando usuários locais, e que os papéis/permissões do guard `senhaunica` sejam adequadamente gerenciados.
+FEATURE_DESCRIPTION: O CotaG L12 já possui uma base para Senha Única com `uspdev/senhaunica-socialite`. Esta tarefa foca em refinar o controller de callback e a lógica de sincronização.
+PROPOSED_SOLUTION:
+1. Criar/Revisar `App\Http\Controllers\Auth\SocialiteController.php` (ou nome similar).
+2. No método `handleProviderCallback`:
+    - Usar `Socialite::driver('senhaunica')->user()` para obter dados.
+    - Usar o Trait `HasSenhaunica` (já no `User` do CotaG L12) para encontrar ou criar o `User` local baseado no `codpes`.
+    - Garantir que `name` e `email` sejam atualizados a partir dos dados da Senha Única.
+    - O Trait `HasSenhaunica` e o pacote `uspdev/senhaunica-socialite` já devem lidar com a atribuição de permissões do guard `senhaunica` (ex: `Servidor@senhaunica`). **Decisão (15.A):** Não armazenar vínculos USP diretamente no `User` local, confiar no guard `senhaunica`.
+    - Marcar `email_verified_at` para usuários Senha Única (CotaG L12 já faz isso via Listener).
+    - Logar o usuário e redirecionar.
+3. **Decisão (10.A):** Para logout, apenas invalidar a sessão Laravel.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `SocialiteController@handleProviderCallback` busca ou cria usuário local com `codpes`, `name`, `email` da Senha Única.
+- [ ] AC2: Usuário é logado com sucesso após callback.
+- [ ] AC3: `email_verified_at` é preenchido para usuários logados via Senha Única.
+- [ ] AC4: Permissões do guard `senhaunica` (ex: `Servidor@senhaunica`) estão acessíveis via `$user->can()`.
+- [ ] AC5: Teste de Feature simula callback da Senha Única (usando `FakeSenhaunicaSocialiteProvider`) e verifica AC1-AC4.
+- [ ] AC6: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F2-AUTH] Refinar Registro Local com Validação Replicado
+TYPE: feature
+LABELS: migracao,autenticacao,registro,replicado,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Adaptar o fluxo de registro local do Laravel Breeze para incluir validação de dados USP via Replicado e atribuir papéis Spatie corretos.
+FEATURE_DESCRIPTION: A view `register.blade.php` (Volt) do CotaG L12 já tem a UI condicional para `codpes`. O backend precisa ser implementado.
+PROPOSED_SOLUTION:
+1. No componente Volt `pages.auth.register` (ou controller equivalente se não for Volt):
+    - Injetar `App\Services\ReplicadoService`.
+    - Na lógica de registro, se `sou_da_usp` for true e `codpes` fornecido:
+        - **Decisão (4.A):** Chamar `ReplicadoService->validarNuspEmail($codpes, $email)`. Se falhar (serviço indisponível ou dados não batem), impedir o registro e retornar erro de validação para o campo `codpes` (ex: `validation.custom.codpes.replicado_validation_failed` ou `validation.custom.codpes.replicado_service_unavailable`).
+    - Ao criar o `User`:
+        - Se a validação USP passou, atribuir o role Spatie `usp_user`.
+        - Caso contrário (não é USP ou validação USP falhou e foi permitido prosseguir como externo - não é o caso devido à Decisão 4.A), atribuir `external_user`.
+    - Disparar evento `Registered` e logar.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Validação no registro chama `ReplicadoService->validarNuspEmail()` para usuários que se declaram USP.
+- [ ] AC2: Registro falha com erro de validação específico se `validarNuspEmail()` retornar `false`.
+- [ ] AC3: Registro falha com erro de validação específico se `ReplicadoService` lançar exceção (serviço indisponível).
+- [ ] AC4: Usuário USP validado com sucesso recebe o role `usp_user` (Spatie, guard `web`).
+- [ ] AC5: Usuário não-USP (ou que não se declarou USP) recebe o role `external_user` (Spatie, guard `web`).
+- [ ] AC6: Evento `Registered` é disparado para novos usuários.
+- [ ] AC7: Teste de Feature (com `FakeReplicadoService`) cobre cenários de sucesso e falha na validação Replicado.
+- [ ] AC8: Teste de Feature verifica atribuição correta de roles `usp_user` e `external_user`.
+- [ ] AC9: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F3-COTAS] Implementar Gerenciamento de Cotas Regulares (Admin)
+TYPE: feature
+LABELS: migracao,cotas,admin,ui,backend,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Permitir que administradores gerenciem as cotas de impressão padrão baseadas no vínculo USP.
+FEATURE_DESCRIPTION: Implementar CRUD para o modelo `App\Models\Cota`.
+PROPOSED_SOLUTION:
+1. Criar `Admin\CotaController` com métodos CRUD (`index`, `create`, `store`, `edit`, `update`, `destroy`).
+2. Implementar `CotaPolicy` para autorizar as ações (apenas `Admin`).
+3. Criar Form Request `StoreCotaRequest` e `UpdateCotaRequest` para validação (ex: `vinculo` obrigatório e único, `valor` obrigatório e numérico positivo).
+4. Criar componentes Livewire/Volt para:
+    - `admin.cotas.index`: Listar cotas, com links para editar/excluir e botão para criar.
+    - `admin.cotas.form`: Formulário para criar/editar cotas.
+5. Definir rotas em `routes/web.php` (ou `routes/admin.php`) protegidas por middleware `role:Admin`.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `Admin\CotaController` com métodos CRUD implementados.
+- [ ] AC2: `CotaPolicy` implementada e registrada, restringindo acesso a Admins.
+- [ ] AC3: Form Requests para validação de criação/atualização de Cota.
+- [ ] AC4: Componente Livewire/Volt para listar cotas (`admin.cotas.index`) funcional.
+- [ ] AC5: Componente Livewire/Volt para formulário de cota (`admin.cotas.form`) funcional para criar e editar.
+- [ ] AC6: Rotas para CRUD de cotas definidas e protegidas.
+- [ ] AC7: Testes de Feature para todas as ações CRUD, incluindo validação e autorização.
+- [ ] AC8: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F3-COTAS-ESP] Implementar Gerenciamento de Cotas Especiais (Admin)
+TYPE: feature
+LABELS: migracao,cotas,admin,ui,backend,replicado,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Permitir que administradores atribuam cotas de impressão especiais e personalizadas para usuários específicos.
+FEATURE_DESCRIPTION: Implementar CRUD para o modelo `App\Models\CotaEspecial`.
+PROPOSED_SOLUTION:
+1. Criar `Admin\CotaEspecialController` com métodos CRUD.
+2. Implementar `CotaEspecialPolicy` (apenas `Admin`).
+3. Criar Form Requests para validação (ex: `user_id` obrigatório e existente, `valor` numérico positivo).
+4. Criar componente Livewire/Volt `admin.cotas-especiais.form` para:
+    - Buscar um usuário: **Decisão (6.B):** Permitir busca direta no Replicado via `ReplicadoService`. Se o usuário for encontrado mas não existir localmente, o componente/controller deve ser capaz de criá-lo (com role `usp_user`, `email_verified_at` preenchido).
+    - Atribuir/Editar o valor da cota especial.
+5. Criar componente Livewire/Volt `admin.cotas-especiais.index` para listar cotas especiais existentes com opção de editar/excluir.
+6. Definir rotas protegidas.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `Admin\CotaEspecialController` com métodos CRUD implementados.
+- [ ] AC2: `CotaEspecialPolicy` implementada e restringindo acesso a Admins.
+- [ ] AC3: Form Requests para validação.
+- [ ] AC4: Componente Livewire/Volt (`admin.cotas-especiais.form`) permite buscar usuário no Replicado e criar usuário local se não existir.
+- [ ] AC5: Componente (`admin.cotas-especiais.form`) permite definir/atualizar valor da cota especial.
+- [ ] AC6: Componente (`admin.cotas-especiais.index`) lista cotas especiais e permite acesso à edição/exclusão.
+- [ ] AC7: Rotas CRUD definidas e protegidas.
+- [ ] AC8: Testes de Feature para CRUD, incluindo busca/criação de usuário via Replicado (com `FakeReplicadoService`) e autorização.
+- [ ] AC9: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F3-LANC] Implementar Lançamentos de Cota (Débito/Crédito)
+TYPE: feature
+LABELS: migracao,lancamentos,cotas,ui,backend,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Permitir que operadores ou administradores registrem débitos (uso de cópias) e créditos (recargas manuais) nas cotas dos usuários.
+FEATURE_DESCRIPTION: Implementar a funcionalidade de lançamento para o modelo `App\Models\Lancamento`.
+PROPOSED_SOLUTION:
+1. Criar `LancamentoController` (protegido para `Operator` e `Admin`).
+    - Método `create` para exibir o formulário.
+    - Método `store` para processar o lançamento.
+2. **Decisão (7.A):** Criar `App\Services\CotaService` (ou `LancamentoService`) com métodos:
+    - `getSaldoAtual(User $user): int`
+    - `registrarLancamento(User $pessoaCota, User $operador, TipoLancamento $tipo, int $valor): Lancamento` (este método deve verificar se o saldo permite débito).
+3. Criar Form Request `StoreLancamentoRequest` (valida `user_id`, `tipo_lancamento`, `valor` positivo, e que o `valor` de débito não excede o saldo disponível via regra customizada que usa o `CotaService`).
+4. Criar componente Livewire/Volt `lancamento-form`:
+    - Campo para buscar/selecionar o `User` (pessoa da cota). Pode reutilizar componente de busca de usuário da tarefa de Cota Especial.
+    - Exibir saldo atual e cota do usuário selecionado (via `CotaService`).
+    - Campos para `valor` e `tipo_lancamento` (Enum PHP `App\Enums\TipoLancamento` - Decisão 17.A).
+    - Botões "Debitar" e "Creditar".
+5. O `operador_id` será o usuário autenticado (`auth()->id()`).
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `App\Services\CotaService` (ou `LancamentoService`) criado com métodos `getSaldoAtual` e `registrarLancamento`.
+- [ ] AC2: Método `registrarLancamento` impede débito se o saldo for insuficiente.
+- [ ] AC3: `LancamentoController` com métodos `create` e `store` implementados.
+- [ ] AC4: `StoreLancamentoRequest` valida os campos e o saldo para débito.
+- [ ] AC5: Enum `App\Enums\TipoLancamento` (`CREDITO`, `DEBITO`) criado e usado.
+- [ ] AC6: Componente Livewire/Volt `lancamento-form` funcional para buscar usuário, exibir saldo/cota e submeter lançamentos.
+- [ ] AC7: Lançamentos são salvos corretamente no banco com `user_id`, `operador_id`, `tipo_lancamento`, `valor` e data.
+- [ ] AC8: Rotas para formulário e submissão de lançamento definidas e protegidas.
+- [ ] AC9: Testes de Feature para registrar débito (com saldo suficiente e insuficiente) e crédito.
+- [ ] AC10: Testes Unitários para os métodos do `CotaService`.
+- [ ] AC11: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F3-EXTRATO] Implementar Visualização de Extrato de Lançamentos
+TYPE: feature
+LABELS: migracao,lancamentos,extrato,ui,backend,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Permitir que usuários visualizem seu próprio extrato de lançamentos e que administradores/operadores visualizem extratos de outros ou consolidados.
+FEATURE_DESCRIPTION: Criar as interfaces e lógica para exibir os `Lancamento`s.
+PROPOSED_SOLUTION:
+1. Criar `ExtratoController`.
+    - Método `meuExtrato` para o usuário logado ver seus próprios lançamentos.
+    - Método `indexAdmin` (protegido para `Admin`/`Operator`) para listar lançamentos com filtros.
+2. Componente Livewire/Volt `meu-extrato-pessoal`: Exibe lançamentos do `auth()->user()`, ordenados por data decrescente, com paginação.
+3. Componente Livewire/Volt `admin.extrato-admin-viewer`:
+    - **Decisão (8.A):** Por padrão, exibe lançamentos do mês atual para todos.
+    - Inclui filtros por usuário (busca por nome/codpes), período (data início/fim), tipo de lançamento.
+    - Exibe resultados paginados.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `ExtratoController@meuExtrato` retorna view com lançamentos do usuário logado.
+- [ ] AC2: Componente `meu-extrato-pessoal` exibe corretamente os lançamentos (data, tipo, valor, operador).
+- [ ] AC3: `ExtratoController@indexAdmin` retorna view com lançamentos filtráveis para Admin/Operator.
+- [ ] AC4: Componente `admin.extrato-admin-viewer` exibe lançamentos do mês atual por padrão.
+- [ ] AC5: Filtros por usuário, período e tipo funcionam no `admin.extrato-admin-viewer`.
+- [ ] AC6: Paginação implementada em ambas as listagens de extrato.
+- [ ] AC7: Rotas `extrato.me` e `admin.extratos.index` definidas e protegidas adequadamente.
+- [ ] AC8: Testes de Feature para visualização de extrato pessoal e admin (com filtros).
+- [ ] AC9: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F3-USERS] Implementar Gerenciamento de Usuários e Papéis (Admin)
+TYPE: feature
+LABELS: migracao,usuarios,admin,autorizacao,ui,backend,spatie,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Permitir que administradores gerenciem usuários do sistema e seus papéis Spatie (guard `web`).
+FEATURE_DESCRIPTION: O CotaG L12 já possui `UserFactory` e views de perfil Breeze. Esta tarefa foca na interface administrativa.
+PROPOSED_SOLUTION:
+1. Criar `Admin\UserController` (protegido para `Admin`).
+    - `index`: Listar todos os usuários com seus papéis Spatie.
+    - `edit`: Exibir formulário para editar papéis de um usuário.
+    - `update`: Atualizar os papéis Spatie de um usuário.
+2. **Decisão (9.A):** A UI de admin para usuários (`admin.users.edit`) permitirá apenas atribuir/remover papéis Spatie *pré-definidos* (`Admin`, `Operator`, `User`, `usp_user`, `external_user`). A definição de permissões por papel será via Seeders/código, não editável na UI.
+3. Criar componentes Livewire/Volt:
+    - `admin.users.index-list`: Tabela de usuários com nome, email, `codpes` (se houver), papéis Spatie, e link para editar papéis.
+    - `admin.users.edit-roles-form`: Formulário para selecionar/dessellecionar papéis Spatie para um usuário.
+4. (Opcional para esta issue, pode ser separada) Criar `Admin\RoleController` e `Admin\PermissionController` se for decidido permitir gerenciamento de papéis/permissões além da atribuição a usuários. Por ora, focar na atribuição.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `Admin\UserController` com métodos `index`, `edit`, `update` para papéis Spatie.
+- [ ] AC2: Componente `admin.users.index-list` exibe usuários e seus papéis Spatie.
+- [ ] AC3: Componente `admin.users.edit-roles-form` permite que Admins alterem os papéis Spatie de um usuário (dentre os pré-definidos).
+- [ ] AC4: Atualização de papéis é refletida corretamente.
+- [ ] AC5: Rotas `admin.users.index`, `admin.users.edit`, `admin.users.update` definidas e protegidas.
+- [ ] AC6: Testes de Feature para listar usuários e atualizar seus papéis Spatie.
+- [ ] AC7: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F3-LOGS] Implementar Visualização de Logs de Atividade (Admin)
+TYPE: feature
+LABELS: migracao,logging,admin,ui,backend,spatie,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Permitir que administradores visualizem os logs de atividade do sistema registrados pelo pacote `spatie/laravel-activitylog`.
+FEATURE_DESCRIPTION: **Decisão (2.B):** Usa `spatie/laravel-activitylog`.
+PROPOSED_SOLUTION:
+1. Criar `Admin\ActivityLogController` (protegido para `Admin`).
+    - `index`: Listar atividades do log, com paginação e filtros.
+2. Criar componente Livewire/Volt `admin.activity-log-viewer`:
+    - Exibe tabela de logs com informações: data, descrição, usuário (causer), objeto (subject).
+    - Filtros por usuário (causer), tipo de evento/modelo (subject_type), período.
+3. Definir rota `admin.logs.index`.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `Admin\ActivityLogController@index` retorna view com logs paginados.
+- [ ] AC2: Componente `admin.activity-log-viewer` exibe logs do `spatie/laravel-activitylog`.
+- [ ] AC3: Filtros por causer, subject_type e período funcionam.
+- [ ] AC4: Paginação funciona para a lista de logs.
+- [ ] AC5: Rota `admin.logs.index` definida e protegida.
+- [ ] AC6: Teste de Feature verifica que a página de logs é acessível para Admins e exibe logs mockados.
+- [ ] AC7: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F4-REPLICADO] Implementar ReplicadoService
+TYPE: feature
+LABELS: migracao,replicado,backend,servico,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Centralizar a lógica de interação com o banco de dados Replicado da USP, fornecendo uma interface clara e testável para outras partes da aplicação.
+FEATURE_DESCRIPTION: Implementar os métodos necessários em `App\Services\ReplicadoService.php` usando o pacote `uspdev/replicado`.
+PROPOSED_SOLUTION:
+1. No `App\Services\ReplicadoService.php` (já existente no CotaG L12):
+    - Implementar `validarNuspEmail(int $codpes, string $email): bool` (baseado em `DaoReplicado.java` e no FormRequest do CotaG L12).
+    - Implementar `buscarPessoaPorCodpes(string $codpes): ?array` (retorna array com dados ou null).
+    - Implementar `buscarPessoaPorEmail(string $email): ?array`.
+    - Implementar `buscarPessoasPorNome(string $criterio): array` (retorna array de arrays).
+    - Implementar `buscarVinculos(string $codpes): array` (retorna array de strings dos vínculos).
+2. **Decisão (14.A):** Manter o Service como um wrapper fino, sem caching interno por ora.
+3. Usar `Pessoa::dump()` e outros métodos do `uspdev/replicado` conforme necessário.
+4. Adicionar tratamento de exceções para falhas de conexão com o Replicado, logando o erro e possivelmente lançando uma exceção customizada (`ReplicadoServiceException`).
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Método `validarNuspEmail` implementado e funcional.
+- [ ] AC2: Método `buscarPessoaPorCodpes` implementado e retornando dados esperados.
+- [ ] AC3: Método `buscarPessoaPorEmail` implementado.
+- [ ] AC4: Método `buscarPessoasPorNome` implementado (incluindo tratamento do critério de busca).
+- [ ] AC5: Método `buscarVinculos` implementado.
+- [ ] AC6: Tratamento de exceções para falhas de conexão/query no Replicado implementado em todos os métodos públicos.
+- [ ] AC7: Testes Unitários para cada método do `ReplicadoService` usando `FakeReplicadoService` (ou mocks diretos de `uspdev/replicado` se o Fake não cobrir).
+- [ ] AC8: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F4-UTILS] Migrar/Substituir Utilitários Java e Configurações
+TYPE: refactor
+LABELS: migracao,utilitarios,configuracao,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+REFACTOR_MOTIVATION: Adaptar ou substituir as classes utilitárias e configurações do sistema Java para equivalentes Laravel ou práticas padrão PHP, garantindo que a nova aplicação tenha as ferramentas necessárias.
+REFACTOR_DESCRIPTION: Analisar cada utilitário e arquivo de propriedades do sistema Java e implementar a solução correspondente no Laravel.
+PROPOSED_SOLUTION:
+- `DataUtility.java`: Substituir por Carbon para manipulação de datas e helpers de formatação Blade/PHP para exibição.
+- `IntegerUtil.isInt()`: Usar regras de validação numérica do Laravel.
+- `Ordenador*`: Usar métodos de Collections do Laravel (`sortBy`, `filter`).
+- `PasswordGenerator.java`: Não migrar; Laravel/Breeze já cuidam da geração e hashing de senhas.
+- `Recursos.java` e `system.properties`:
+    - **Decisão (20.C - Interpretada):** Mapear `oauth-key`, `oauth-secret`, endpoints OAuth para `config/services.php` (ex: `services.senhaunica.client_id`) e popular via `.env`. Acessar via `config()`.
+    - `app-name`, `app-url`: Mapear para `.env` (`APP_NAME`, `APP_URL`) e usar `config('app.name')`, `config('app.url')`.
+    - `logout-url-usp`, `logout-url-local`: Se a URL de logout centralizado da Senha Única for usada (Decisão 10.A indica que não inicialmente), pode ser uma entrada no `.env` (ex: `SENHAUNICA_LOGOUT_URL`) acessada via `config()`. Logout local é tratado pelo Laravel.
+- `messages.properties`: Migrar todas as chaves e valores para os arquivos `lang/pt_BR.json` e `lang/en.json` (já existentes no CotaG L12). Garantir que todos os textos da UI usem `__()`.
+- `StringUtils.sgldepToCodset`: **Decisão (11.B):** Não será migrado.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Lógica de `DataUtility.java` substituída por Carbon/helpers Laravel onde necessário.
+- [ ] AC2: Configurações de OAuth e URLs de `system.properties` movidas para `.env` e `config/services.php` ou `config/app.php`.
+- [ ] AC3: Chaves de `messages.properties` migradas para `lang/pt_BR.json` e `lang/en.json`.
+- [ ] AC4: Todas as referências a `Recursos.java` e `messages.properties` no código migrado são substituídas por `config()` e `__()` respectivamente.
+- [ ] AC5: Funcionalidade `sgldepToCodset` removida/não portada conforme Decisão 11.B.
+- [ ] AC6: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F4-JSF] Mapear Conceitos JSF para Laravel/Livewire
+TYPE: refactor
+LABELS: migracao,jsf,livewire,ui,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+REFACTOR_MOTIVATION: Traduzir os padrões de interação e gerenciamento de estado do JSF (Managed Beans, Phase Listeners, Converters) para a arquitetura Laravel com Livewire/Volt.
+REFACTOR_DESCRIPTION: Analisar o uso de `PageTransitionBean.java`, `RestoreViewPhaseListener.java`, `GenericConverter.java` e `MessageBean.java` e implementar equivalentes.
+PROPOSED_SOLUTION:
+- `PageTransitionBean.java` (navegação): Substituir por rotas nomeadas Laravel (`route()`) e `redirect()` nos controllers/componentes Livewire.
+- `RestoreViewPhaseListener.java` (controle de acesso): Substituir por Middlewares Laravel (`auth`, `guest`, customizados) aplicados às rotas.
+- `GenericConverter.java` (conversores JSF): Para formatação de dados, usar Accessors/Mutators Eloquent, helpers Blade, ou formatação dentro de componentes Livewire. Para binding, Livewire lida com isso.
+- `MessageBean.java` (mensagens de erro/sucesso):
+    - **Decisão (16.C):** Usar mensagens Flash (`session()->flash()`) para redirecionamentos HTTP tradicionais.
+    - Usar o sistema de validação do Livewire (com `$this->addError()` ou `$this->validate()`) e eventos (`$this->dispatch()`) para feedback em tempo real dentro de componentes Livewire/Volt.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Lógica de navegação do `PageTransitionBean` é implementada usando rotas e redirecionamentos Laravel.
+- [ ] AC2: Lógica de controle de acesso do `RestoreViewPhaseListener` é implementada usando Middlewares Laravel.
+- [ ] AC3: Funcionalidades de `GenericConverter` são substituídas por mecanismos Laravel/Livewire apropriados.
+- [ ] AC4: Mensagens de feedback ao usuário (erros, sucesso) são implementadas usando Flash sessions e/ou eventos/validação Livewire, conforme Decisão 16.C.
+- [ ] AC5: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F5-TEST] Implementar Suíte de Testes Abrangente
+TYPE: test
+LABELS: migracao,testes,phpunit,dusk,qualidade,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+TEST_MOTIVATION: Garantir a qualidade, corretude e estabilidade da aplicação migrada através de uma suíte de testes automatizados robusta.
+TEST_SCOPE: Todos os modelos, services, controllers, componentes Livewire/Volt e fluxos de usuário críticos.
+TEST_APPROACH:
+1. Utilizar PHPUnit para testes Unitários (Models, Services, Enums, Helpers) e testes de Feature (Controllers, Form Requests, Policies, interações entre componentes de backend).
+2. Utilizar Laravel Dusk para testes de Browser (End-to-End) dos principais fluxos de usuário e interações da UI.
+3. Usar Factories Eloquent para gerar dados de teste.
+4. Usar `FakeReplicadoService` e `FakeSenhaunicaSocialiteProvider` (já no CotaG L12) para mockar dependências externas USP.
+5. Aspirar a uma alta cobertura de código (ex: >80-90%).
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Testes Unitários criados para todos os Models Eloquent migrados/criados (verificando relacionamentos, scopes, accessors/mutators).
+- [ ] AC2: Testes Unitários criados para o `CotaService` e `ReplicadoService`.
+- [ ] AC3: Testes de Feature criados para todas as rotas e actions de Controllers (CRUDs, autenticação, registro, lançamentos, extratos).
+- [ ] AC4: Testes de Feature verificam a lógica de Policies e Form Requests.
+- [ ] AC5: Testes Dusk criados para os fluxos de usuário mais importantes (login local, login Senha Única, registro local, lançamento de cota, visualização de extrato, gerenciamento admin de cotas/usuários).
+- [ ] AC6: Todos os testes passam com sucesso no ambiente de CI.
+- [ ] AC7: Cobertura de código atinge o alvo definido (ex: 85%).
+- [ ] AC8: Código dos testes passa no Pint e Larastan.
+------
+TITLE: [MIG][F5-UIUX] Revisar e Refinar UI/UX
+TYPE: feature
+LABELS: migracao,ui,ux,tailwind,livewire,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+FEATURE_MOTIVATION: Assegurar que a interface do usuário da aplicação migrada seja moderna, responsiva, intuitiva e alinhada com as boas práticas de UX, utilizando a stack TALL.
+FEATURE_DESCRIPTION: Revisar todas as telas migradas e componentes Livewire/Volt.
+PROPOSED_SOLUTION:
+1. **Decisão (12.A):** Onde componentes PrimeFaces complexos foram simplificados, validar se a funcionalidade essencial foi mantida e se a UX é aceitável. Se necessário, planejar melhorias futuras.
+2. Garantir consistência visual (cores, fontes, espaçamento) em toda a aplicação, usando o tema Tailwind e componentes `x-usp.header` do CotaG L12.
+3. Verificar responsividade em diferentes tamanhos de tela (desktop, tablet, mobile).
+4. Melhorar mensagens de feedback (validação, sucesso, erro) para serem claras e úteis.
+5. **Decisão (19.A):** Implementar CSS específico para impressão (`@media print`) para telas chave como Extrato.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Todas as telas principais são responsivas e visualmente consistentes.
+- [ ] AC2: Fluxos de usuário são intuitivos e fáceis de seguir.
+- [ ] AC3: Mensagens de erro e sucesso são claras e bem posicionadas.
+- [ ] AC4: CSS de impressão (`@media print`) implementado para a tela de Extrato.
+- [ ] AC5: Verificação de acessibilidade básica realizada (ex: contraste, navegação por teclado nos formulários).
+- [ ] AC6: Código passa no Pint e Larastan.
+------
+TITLE: [MIG][F5-DOC] Atualizar Documentação do Projeto
+TYPE: chore
+LABELS: migracao,documentacao,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+CHORE_MOTIVATION: Manter a documentação do CotaG L12 (README, Wiki) atualizada para refletir o sistema "CotaG L12" completo após a migração das funcionalidades do "cotag" Java.
+CHORE_DESCRIPTION: Revisar e atualizar toda a documentação existente e adicionar novas seções conforme necessário.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: `README.md` atualizado com a descrição final do CotaG L12, funcionalidades principais e como rodar/testar.
+- [ ] AC2: Wiki do GitHub atualizada/criada com:
+    - Arquitetura geral do sistema migrado.
+    - Detalhes do fluxo de autenticação dupla.
+    - Explicação do sistema de papéis/permissões (Spatie e Senha Única).
+    - Instruções de configuração de ambiente (incluindo `.env` para Senha Única, Replicado).
+    - Guia de como usar os Fakes para testes.
+- [ ] AC3: `CHANGELOG.md` atualizado com as principais mudanças da migração.
+- [ ] AC4: DocBlocks no código PHP revisados e completos.
+- [ ] AC5: Documentos seguem o padrão de versionamento (`docs/versionamento_documentacao.md`).
+------
+TITLE: [MIG][F5-DEPLOY] Documentar Considerações de Implantação
+TYPE: chore
+LABELS: migracao,deploy,documentacao,todo
+ASSIGNEE: @me
+PROJECT: Cotag L12 Migration
+CHORE_MOTIVATION: Fornecer um guia básico para a implantação da aplicação Laravel migrada em um ambiente de produção.
+CHORE_DESCRIPTION: Documentar os passos e configurações chave para o deploy.
+ACCEPTANCE_CRITERIA:
+- [ ] AC1: Seção na Wiki criada/atualizada sobre "Implantação".
+- [ ] AC2: Documentado como configurar o arquivo `.env.production` (chaves, URLs, DB, Cache, Queue, Mail).
+- [ ] AC3: Documentado como configurar o servidor web (Nginx/Apache) para servir a aplicação Laravel.
+- [ ] AC4: Documentado como configurar workers de fila (ex: Supervisor).
+- [ ] AC5: Documentado como configurar o Scheduler do Laravel.
+- [ ] AC6: Documentado o uso dos comandos `php artisan optimize:clear`, `config:cache`, `route:cache`, `view:cache` para produção.
+- [ ] AC7: Considerações sobre permissões de diretório (`storage`, `bootstrap/cache`) mencionadas.
