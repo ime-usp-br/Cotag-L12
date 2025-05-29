@@ -6,8 +6,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
-use Uspdev\SenhaunicaSocialite\Traits\HasSenhaunica;
 use Tests\TestCase;
+use Uspdev\SenhaunicaSocialite\Traits\HasSenhaunica;
 
 class UserTest extends TestCase
 {
@@ -18,7 +18,7 @@ class UserTest extends TestCase
      */
     public function test_user_model_has_correct_fillable_attributes(): void
     {
-        $user = new User();
+        $user = new User;
         $expectedFillable = [
             'name',
             'email',
@@ -33,7 +33,7 @@ class UserTest extends TestCase
      */
     public function test_user_model_has_correct_hidden_attributes(): void
     {
-        $user = new User();
+        $user = new User;
         $expectedHidden = [
             'password',
             'remember_token',
@@ -47,7 +47,7 @@ class UserTest extends TestCase
      */
     public function test_user_model_has_correct_casts(): void
     {
-        $user = new User();
+        $user = new User;
         $expectedCasts = [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
@@ -99,7 +99,7 @@ class UserTest extends TestCase
      */
     public function test_user_model_implements_must_verify_email(): void
     {
-        $this->assertInstanceOf(\Illuminate\Contracts\Auth\MustVerifyEmail::class, new User());
+        $this->assertInstanceOf(\Illuminate\Contracts\Auth\MustVerifyEmail::class, new User);
     }
 
     /**
